@@ -3,6 +3,8 @@ name: Build
 # Fork/本地验证用的全平台构建：只负责产出安装包，不跑安装、更新冒烟，也不创建 Release。
 # 正式发版仍走 release.yml。所有 job 使用 SDK main 源码，避免依赖尚未发布的 SDK 版本。
 on:
+  push:
+    branches: [ci-build]
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +26,7 @@ jobs:
         id: derive
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version || '9.9.9' }}
         run: |
           if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "Version must use MAJOR.MINOR.PATCH"
