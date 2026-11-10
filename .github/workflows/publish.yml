@@ -1,0 +1,56 @@
+name: Publish test build
+
+# 一次性：把某次 Build 运行的产物汇总成 mrkangi/piko 的预发布，避免本机重新下载 GB 级产物。
+on:
+  push:
+    branches: [publish]
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: Build workflow run id
+        required: false
+        default: '42849344581'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RUN_ID: ${{ inputs.run-id || '42849344581' }}
+      TAG: test-20261111-remote-order-desktop
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+          merge-multiple: true
+
+      - name: Publish prerelease
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          cat > notes.md <<'EOF'
+          Jellyfin / 远程下载测试版（2026-11-11）
+
+          - 远程下载列表改为按添加时间固定排序，进度刷新不再导致列表跳动
+          - 系统 HTTP 代理修复非交错 MP4 音视频双轨频繁切轨时重复建连、吞吐跌到 100 KB/s 的问题：16 MiB 环形预读窗口、同轨游标接管、可取消读取
+          - 桌面端补齐 R8 keep 规则，保证 MQTT 与 Jellyfin SDK 在 release 包可用
+
+          平台：Android（arm64-v8a / universal）、Windows x64 与 arm64（7z 便携版、MSI）、macOS arm64（DMG）、Linux x64（AppImage）
+
+          安装提示：
+          - Windows 可能提示未知发布者，选择“仍要运行”
+          - macOS 首次打开如提示无法验证开发者，右键打开，或执行：xattr -dr com.apple.quarantine /Applications/Piko.app
+
+          构建来源：GitHub Actions 运行 42849344581
+          EOF
+          if gh release view "$TAG" --repo mrkangi/piko >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo mrkangi/piko --clobber
+          else
+            gh release create "$TAG" dist/* --repo mrkangi/piko --prerelease --title "$TAG" --notes-file notes.md
+          fi
